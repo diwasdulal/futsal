@@ -189,3 +189,20 @@ export const getBookingsForCalendar = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getAllBookings = async (req, res) => {
+  try {
+    const [bookings] = await pool.query(
+      `SELECT b.id, u.name AS user, c.name AS court, b.date, b.start_time, b.end_time, b.status 
+       FROM bookings b 
+       JOIN users u ON b.user_id = u.id
+       JOIN courts c ON b.court_id = c.id
+       ORDER BY b.date DESC`
+    );
+
+    res.json(bookings);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

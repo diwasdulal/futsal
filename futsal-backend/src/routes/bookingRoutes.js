@@ -1,6 +1,7 @@
 import express from "express";
-import { bookCourt, getBookings, cancelBooking, modifyBooking, bookRecurringCourt, getBookingsForCalendar } from "../controllers/bookingController.js";
+import { bookCourt, getBookings, cancelBooking, modifyBooking, bookRecurringCourt, getBookingsForCalendar, getAllBookings } from "../controllers/bookingController.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { protectAdmin } from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
 
@@ -10,5 +11,6 @@ router.get("/", protect, getBookings); // Get all user bookings
 router.put("/:id", protect, modifyBooking); // New route to modify an existing booking
 router.delete("/:id", protect, cancelBooking); // Cancel a booking
 router.get("/calendar/:year/:month", protect, getBookingsForCalendar);
+router.get("/admin", protect, protectAdmin, getAllBookings);
 
 export default router;

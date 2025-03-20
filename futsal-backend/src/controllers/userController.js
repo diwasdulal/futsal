@@ -28,3 +28,39 @@ export const changePassword = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// View all users
+export const getUsers = async (req, res) => {
+  try {
+    const [users] = await pool.query("SELECT * FROM users");
+    res.json(users);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Track bookings for a specific user
+export const getUserBookings = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const [bookings] = await pool.query("SELECT * FROM bookings WHERE user_id = ?", [userId]);
+    res.json(bookings);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Ban a user
+export const banUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [result] = await pool.query("UPDATE users SET role = 'banned' WHERE id = ?", [id]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "User banned successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
