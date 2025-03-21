@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useQuery, useMutation } from "react-query";
-import { fetchBookingsForDate, bookCourt } from "../api/bookingApi";
+import { fetchBookingsForDate, bookCourt, fetchCourts } from "../api/bookingApi";
 import { io } from "socket.io-client";
 
 const socket = io("http://localhost:5000");
@@ -10,8 +10,13 @@ const socket = io("http://localhost:5000");
 const Booking = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedCourt, setSelectedCourt] = useState("");
   const [availableSlots, setAvailableSlots] = useState([]);
 
+  // Fetch courts
+  const { data: courts } = useQuery("courts", fetchCourts);
+
+  // Fetch bookings for selected date
   const { data: bookings, refetch } = useQuery(["bookings", selectedDate], () => fetchBookingsForDate(selectedDate.toISOString().split("T")[0]), { enabled: !!selectedDate });
 
   useEffect(() => {
@@ -51,14 +56,14 @@ const Booking = () => {
   });
 
   const handleBooking = () => {
-    if (!selectedSlot) {
-      alert("Please select a slot");
+    if (!selectedSlot || !selectedCourt) {
+      alert("Please select a court and a time slot");
       return;
     }
 
     const [start_time, end_time] = selectedSlot.split(" - ");
     mutation.mutate({
-      court_id: 1,
+      court_id: selectedCourt,
       date: selectedDate.toISOString().split("T")[0],
       start_time,
       end_time,
@@ -70,11 +75,26 @@ const Booking = () => {
       <div className="bg-white shadow-lg p-6 rounded-lg w-full max-w-md">
         <h2 className="text-xl font-bold text-center mb-4">Book a Court</h2>
 
+        {/* Court Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium">Select Court:</label>
+          <select className="w-full p-2 border rounded-lg" value={selectedCourt} onChange={(e) => setSelectedCourt(e.target.value)}>
+            <option value="">Select a court</option>
+            {courts?.map((court) => (
+              <option key={court.id} value={court.id}>
+                {court.name} - {court.location}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Date Selection */}
         <div className="mb-4">
           <label className="block text-sm font-medium">Select Date:</label>
           <DatePicker selected={selectedDate} onChange={(date) => setSelectedDate(date)} dateFormat="yyyy-MM-dd" className="w-full p-2 border rounded-lg" />
         </div>
 
+        {/* Time Slot Selection */}
         <div className="mb-4">
           <label className="block text-sm font-medium">Select Time Slot:</label>
           <div className="grid grid-cols-2 gap-2 mt-2">
@@ -90,6 +110,7 @@ const Booking = () => {
           </div>
         </div>
 
+        {/* Confirm Booking */}
         <button onClick={handleBooking} className="w-full bg-green-600 text-white p-2 rounded-lg">
           Confirm Booking
         </button>

@@ -64,3 +64,45 @@ export const banUser = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const createUser = async (req, res) => {
+  try {
+    const { name, email, phone, password } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await pool.query("INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)", [name, email, phone, hashedPassword]);
+    res.status(201).json({ message: "User created", userId: result.insertId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [result] = await pool.query("DELETE FROM users WHERE id = ?", [id]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, phone } = req.body;
+
+    const [result] = await pool.query("UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?", [name, email, phone, id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User updated successfully" });
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

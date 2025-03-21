@@ -24,6 +24,31 @@ export const getTournaments = async (req, res) => {
   }
 };
 
+export const updateTournament = async (req, res) => {
+  try {
+    const { name, start_date, end_date } = req.body;
+    const { id } = req.params;
+    const [result] = await pool.query("UPDATE tournaments SET name = ?, start_date = ?, end_date = ? WHERE id = ?", [name, start_date, end_date, id]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Tournament not found" });
+    res.json({ message: "Tournament updated successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const deleteTournament = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [result] = await pool.query("DELETE FROM tournaments WHERE id = ?", [id]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Tournament not found" });
+    res.json({ message: "Tournament deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const notifyUpcomingTournaments = async () => {
   try {
     const [tournaments] = await pool.query("SELECT * FROM tournaments WHERE start_date = CURDATE() + INTERVAL 3 DAY");
