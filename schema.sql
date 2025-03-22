@@ -49,12 +49,11 @@ CREATE TABLE payments (
 -- Teams Table
 CREATE TABLE teams (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    name VARCHAR(100) UNIQUE NOT NULL,
-    players JSON NOT NULL,
-    -- Store player details as JSON
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    user_id INT,
+    tournament_id INT,
+    team_name VARCHAR(100),
+    members TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tournaments Table
@@ -100,3 +99,8 @@ ALTER TABLE
     teams
 ADD
     COLUMN points INT DEFAULT 0;
+
+ALTER TABLE
+    bookings
+ADD
+    COLUMN payment_status VARCHAR(50) DEFAULT 'pending';

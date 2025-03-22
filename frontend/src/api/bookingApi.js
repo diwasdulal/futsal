@@ -21,3 +21,10 @@ export const bookCourt = async (data) => {
   });
   return response.data;
 };
+
+export const bookRecurringCourt = async (data) => {
+  const response = await axios.post(`${API_URL}/recurring`, data, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data;
+};

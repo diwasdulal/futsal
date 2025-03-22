@@ -1,9 +1,11 @@
 import pool from "../config/db.js";
-import { sendCancellationEmail, sendSlotOpeningEmail } from "../config/mail.js";
+import { sendBookingConfirmation, sendCancellationEmail, sendSlotOpeningEmail } from "../config/mail.js";
 
 export const bookCourt = async (req, res) => {
   try {
     const { court_id, date, start_time, end_time } = req.body;
+    console.log(req.body);
+
     const user_id = req.user.id;
 
     const bookingDate = new Date(date);
@@ -46,8 +48,7 @@ export const bookCourt = async (req, res) => {
       return res.status(400).json({ message: "No available slots today" });
     }
 
-    // Insert the new booking
-    await pool.query("INSERT INTO bookings (user_id, court_id, date, start_time, end_time, status) VALUES (?, ?, ?, ?, ?, 'confirmed')", [
+    const [result] = await pool.query("INSERT INTO bookings (user_id, court_id, date, start_time, end_time, status) VALUES (?, ?, ?, ?, ?, 'confirmed')", [
       user_id,
       court_id,
       date,
@@ -55,7 +56,19 @@ export const bookCourt = async (req, res) => {
       end_time,
     ]);
 
-    res.status(201).json({ message: "Booking successful" });
+    const [user] = await pool.query("SELECT email FROM users WHERE id = ?", [user_id]);
+    const [court] = await pool.query("SELECT name FROM courts WHERE id = ?", [court_id]);
+
+    await sendBookingConfirmation(user[0].email, {
+      court: court[0].name,
+      date,
+      start_time,
+      end_time,
+    });
+
+    const bookingId = result.insertId;
+
+    res.status(201).json({ message: "Booking successful", bookingId });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -64,7 +77,16 @@ export const bookCourt = async (req, res) => {
 
 export const getBookings = async (req, res) => {
   try {
-    const [bookings] = await pool.query("SELECT * FROM bookings WHERE user_id = ?", [req.user.id]);
+    const [bookings] = await pool.query(
+      `SELECT 
+         b.*, 
+         c.name AS court 
+       FROM bookings b
+       JOIN courts c ON b.court_id = c.id
+       WHERE b.user_id = ?`,
+      [req.user.id]
+    );
+
     res.json(bookings);
   } catch (error) {
     console.error(error);
@@ -137,10 +159,19 @@ export const modifyBooking = async (req, res) => {
 
     if (conflict.length > 0) return res.status(400).json({ message: "New time slot is already booked" });
 
-    // Update booking details
     await pool.query("UPDATE bookings SET date = ?, start_time = ?, end_time = ? WHERE id = ?", [date, start_time, end_time, bookingId]);
 
-    res.json({ message: "Booking updated successfully" });
+    const [user] = await pool.query("SELECT email FROM users WHERE id = ?", [user_id]);
+    const [court] = await pool.query("SELECT name FROM courts WHERE id = ?", [booking[0].court_id]);
+
+    await sendBookingConfirmation(user[0].email, {
+      court: court[0].name,
+      date,
+      start_time,
+      end_time,
+    });
+
+    res.json({ message: "Booking updated and confirmation sent" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -153,13 +184,11 @@ export const bookRecurringCourt = async (req, res) => {
 
     let dates = [];
     let currentDate = new Date(start_date);
-
     for (let i = 0; i < 4; i++) {
+      dates.push(new Date(currentDate).toISOString().split("T")[0]);
       if (recurrence === "weekly") currentDate.setDate(currentDate.getDate() + 7);
       else if (recurrence === "monthly") currentDate.setMonth(currentDate.getMonth() + 1);
-      dates.push(new Date(currentDate).toISOString().split("T")[0]);
     }
-
     for (let date of dates) {
       await pool.query("INSERT INTO bookings (user_id, court_id, date, start_time, end_time, status) VALUES (?, ?, ?, ?, ?, 'confirmed')", [
         user_id,
@@ -169,6 +198,16 @@ export const bookRecurringCourt = async (req, res) => {
         end_time,
       ]);
     }
+
+    const [user] = await pool.query("SELECT email FROM users WHERE id = ?", [user_id]);
+    const [court] = await pool.query("SELECT name FROM courts WHERE id = ?", [court_id]);
+
+    await sendBookingConfirmation(user[0].email, {
+      court: court[0].name,
+      date: `${start_date} + ${dates.length - 1} more`, // basic range display
+      start_time,
+      end_time,
+    });
 
     res.status(201).json({ message: "Recurring bookings created successfully" });
   } catch (error) {

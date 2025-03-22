@@ -1,5 +1,5 @@
 import express from "express";
-import { updateProfile, changePassword, getUsers, getUserBookings, banUser, createUser, updateUser, deleteUser } from "../controllers/userController.js";
+import { updateProfile, changePassword, getUsers, getUserBookings, banUser, createUser, updateUser, deleteUser, getCurrentUser } from "../controllers/userController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { protectAdmin } from "../middleware/adminMiddleware.js";
 
@@ -13,5 +13,6 @@ router.get("/", protect, protectAdmin, getUsers); // View all users (Admin only)
 router.post("/", protect, protectAdmin, createUser);
 router.put("/:id", protect, protectAdmin, updateUser);
 router.delete("/:id", protect, protectAdmin, deleteUser);
+router.get("/me", protect, getCurrentUser);
 
 export default router;

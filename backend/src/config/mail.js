@@ -4,11 +4,14 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  service: "Gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // use STARTTLS
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASSWORD,
   },
+  requireTLS: true,
 });
 
 export const sendBookingConfirmation = async (email, details) => {

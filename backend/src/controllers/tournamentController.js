@@ -66,3 +66,69 @@ export const notifyUpcomingTournaments = async () => {
 
 // Run this function every day at midnight
 setInterval(notifyUpcomingTournaments, 24 * 60 * 60 * 1000);
+
+// Get upcoming tournaments
+export const getUpcomingTournaments = async (req, res) => {
+  try {
+    const [tournaments] = await pool.query("SELECT * FROM tournaments WHERE start_date >= CURDATE() ORDER BY start_date ASC");
+    res.json(tournaments);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Register team
+export const registerTeamForTournament = async (req, res) => {
+  try {
+    const { tournament_id, team_name, members } = req.body;
+    const user_id = req.user.id;
+
+    if (!tournament_id || !team_name || !members) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    await pool.query("INSERT INTO teams (user_id, tournament_id, team_name, members) VALUES (?, ?, ?, ?)", [user_id, tournament_id, team_name, members]);
+
+    res.status(201).json({ message: "Team registered successfully!" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getMyRegistrations = async (req, res) => {
+  try {
+    const user_id = req.user.id;
+
+    const [registrations] = await pool.query(
+      `SELECT t.id as tournament_id, t.name, t.start_date, t.end_date
+       FROM teams tt
+       JOIN tournaments t ON tt.tournament_id = t.id
+       WHERE tt.user_id = ?`,
+      [user_id]
+    );
+
+    res.json(registrations);
+  } catch (error) {
+    console.error("Error fetching user registrations:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getTeamsForTournament = async (req, res) => {
+  const tournamentId = req.params.id;
+
+  try {
+    const [teams] = await pool.query(
+      `SELECT id, team_name, members, created_at 
+       FROM teams 
+       WHERE tournament_id = ?`,
+      [tournamentId]
+    );
+
+    res.json(teams);
+  } catch (error) {
+    console.error("Error fetching teams:", error);
+    res.status(500).json({ message: "Failed to retrieve teams" });
+  }
+};

@@ -1,25 +1,21 @@
 // src/utils/auth.js
-import { jwtDecode } from "jwt-decode";
+export const getToken = () => localStorage.getItem("token");
 
-export const isAdmin = () => {
-  const token = localStorage.getItem("token");
-  if (!token) return false;
-  try {
-    const decoded = jwtDecode(token);
-    return decoded.role === "admin";
-  } catch (error) {
-    return false;
-  }
+export const getCurrentUser = () => {
+  const user = localStorage.getItem("user");
+  return user ? JSON.parse(user) : null;
 };
 
 export const isLoggedIn = () => {
-  const token = localStorage.getItem("token");
-  if (!token) return false;
-  try {
-    const decoded = jwtDecode(token);
-    const currentTime = Date.now() / 1000;
-    return decoded.exp && decoded.exp > currentTime;
-  } catch (error) {
-    return false;
-  }
+  const user = getCurrentUser();
+  const token = getToken();
+  if (!user || !token) return false;
+
+  const currentTime = Date.now() / 1000;
+  return user.exp && user.exp > currentTime;
+};
+
+export const isAdmin = () => {
+  const user = getCurrentUser();
+  return user?.role === "admin" && isLoggedIn();
 };

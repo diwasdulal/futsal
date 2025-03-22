@@ -1,7 +1,11 @@
-// src/pages/AdminPanel.js
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import axios from "axios";
 import { useState } from "react";
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import Swal from "sweetalert2"; // ✅ SweetAlert2
 
 const fetchData = (url) =>
   axios
@@ -10,18 +14,22 @@ const fetchData = (url) =>
     })
     .then((res) => res.data);
 
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#9c27b0", "#ff4444", "#26c6da", "#66bb6a", "#ffa726"];
+
 const AdminPanel = () => {
   const [tab, setTab] = useState("users");
   const [editItem, setEditItem] = useState(null);
-  const [newItem, setNewItem] = useState({});
+  const [form, setForm] = useState({});
   const queryClient = useQueryClient();
+
+  const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
   const { data: users = [] } = useQuery("users", () => fetchData("http://localhost:5000/api/users"));
   const { data: courts = [] } = useQuery("courts", () => fetchData("http://localhost:5000/api/courts"));
   const { data: bookings = [] } = useQuery("bookings", () => fetchData("http://localhost:5000/api/bookings/admin"));
   const { data: tournaments = [] } = useQuery("tournaments", () => fetchData("http://localhost:5000/api/tournaments"));
-
-  const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+  const { data: activityReport = [] } = useQuery("activityReport", () => fetchData("http://localhost:5000/api/reports/user-activity"));
+  const { data: courtReport = [] } = useQuery("courtReport", () => fetchData("http://localhost:5000/api/reports/court-utilization"));
 
   const deleteItem = async (id) => {
     const endpoints = {
@@ -30,10 +38,22 @@ const AdminPanel = () => {
       bookings: `http://localhost:5000/api/bookings/${id}`,
       tournaments: `http://localhost:5000/api/tournaments/${id}`,
     };
+
     if (endpoints[tab]) {
-      await axios.delete(endpoints[tab], { headers });
-      queryClient.invalidateQueries(tab);
-      alert("Deleted successfully");
+      const result = await Swal.fire({
+        title: "Are you sure?",
+        text: "This action cannot be undone!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes, delete it!",
+        confirmButtonColor: "#e11d48",
+      });
+
+      if (result.isConfirmed) {
+        await axios.delete(endpoints[tab], { headers });
+        queryClient.invalidateQueries(tab);
+        Swal.fire("Deleted!", "Record has been removed.", "success");
+      }
     }
   };
 
@@ -41,138 +61,106 @@ const AdminPanel = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(tab);
       setEditItem(null);
-      setNewItem({});
-      alert("Saved successfully");
+      setForm({});
+      Swal.fire("Success", "Saved successfully", "success");
     },
   });
 
-  const currentData = { users, courts, bookings, tournaments }[tab];
-
-  const renderTable = (items) => (
-    <table className="w-full table-auto border">
-      <thead>
-        <tr className="bg-gray-200">
-          {Object.keys(items[0] || {}).map((key) => (
-            <th key={key} className="px-4 py-2">
-              {key}
-            </th>
-          ))}
-          <th className="px-4 py-2">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item) => (
-          <tr key={item.id} className="border-t">
-            {Object.keys(item).map((key) => (
-              <td key={key} className="px-4 py-2">
-                {item[key]}
-              </td>
-            ))}
-            <td className="px-4 py-2 space-x-2">
-              <button onClick={() => setEditItem(item)} className="px-2 py-1 bg-yellow-400 text-white rounded">
-                Edit
-              </button>
-              <button onClick={() => deleteItem(item.id)} className="px-2 py-1 bg-red-600 text-white rounded">
-                Delete
-              </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+  const handleCreate = (e) => {
+    e.preventDefault();
+    const urlMap = {
+      users: "http://localhost:5000/api/auth/register",
+      courts: "http://localhost:5000/api/courts",
+      bookings: "http://localhost:5000/api/bookings",
+      tournaments: "http://localhost:5000/api/tournaments",
+    };
+    mutation.mutate({ url: urlMap[tab], method: "post", payload: form });
+  };
 
   const renderCreateForm = () => {
-    const handleChange = (e) => setNewItem({ ...newItem, [e.target.name]: e.target.value });
-
-    const handleSubmit = () => {
-      const urlMap = {
-        users: "http://localhost:5000/api/users",
-        courts: "http://localhost:5000/api/courts",
-        bookings: "http://localhost:5000/api/bookings",
-        tournaments: "http://localhost:5000/api/tournaments",
-      };
-      mutation.mutate({ url: urlMap[tab], method: "post", payload: newItem });
-      setNewItem({});
-    };
+    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+    const inputClass = "w-full p-2 border rounded mb-2";
 
     return (
-      <div className="bg-white p-4 rounded shadow mb-4">
-        <h2 className="text-lg font-semibold mb-4">Create New {tab.slice(0, 1).toUpperCase() + tab.slice(1)}</h2>
-
+      <form onSubmit={handleCreate} className="bg-white rounded-xl shadow p-6 mb-8 max-w-2xl mx-auto">
+        <h3 className="text-xl font-semibold mb-4 text-indigo-700">Create New {tab.charAt(0).toUpperCase() + tab.slice(1)}</h3>
         {tab === "users" && (
           <>
-            <label className="block mb-1 font-medium">Name</label>
-            <input name="name" placeholder="Enter name" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Email</label>
-            <input name="email" type="email" placeholder="Enter email" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Phone</label>
-            <input name="phone" placeholder="Enter phone number" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Password</label>
-            <input name="password" type="password" placeholder="Create password" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
+            <input name="name" placeholder="Name" onChange={handleChange} className={inputClass} required />
+            <input name="email" type="email" placeholder="Email" onChange={handleChange} className={inputClass} required />
+            <input name="phone" placeholder="Phone" onChange={handleChange} className={inputClass} required />
+            <input name="password" type="password" placeholder="Password" onChange={handleChange} className={inputClass} required />
           </>
         )}
-
         {tab === "courts" && (
           <>
-            <label className="block mb-1 font-medium">Court Name</label>
-            <input name="name" placeholder="Enter court name" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Location</label>
-            <input name="location" placeholder="Enter location" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Price Per Hour</label>
-            <input name="price_per_hour" placeholder="Enter price" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Available Slots</label>
-            <input name="available_slots" placeholder="Enter number of slots" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
+            <input name="name" placeholder="Court Name" onChange={handleChange} className={inputClass} required />
+            <input name="location" placeholder="Location" onChange={handleChange} className={inputClass} required />
+            <input name="price_per_hour" placeholder="Price Per Hour" onChange={handleChange} className={inputClass} required />
+            <input name="available_slots" placeholder="Available Slots" onChange={handleChange} className={inputClass} required />
           </>
         )}
-
         {tab === "bookings" && (
           <>
-            <label className="block mb-1 font-medium">Court ID</label>
-            <input name="court_id" placeholder="Enter court ID" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Date</label>
-            <input name="date" type="date" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Start Time</label>
-            <input name="start_time" type="time" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">End Time</label>
-            <input name="end_time" type="time" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
+            <input name="court_id" placeholder="Court ID" onChange={handleChange} className={inputClass} required />
+            <input name="date" type="date" placeholder="Date" onChange={handleChange} className={inputClass} required />
+            <input name="start_time" type="time" placeholder="Start Time" onChange={handleChange} className={inputClass} required />
+            <input name="end_time" type="time" placeholder="End Time" onChange={handleChange} className={inputClass} required />
           </>
         )}
-
         {tab === "tournaments" && (
           <>
-            <label className="block mb-1 font-medium">Tournament Name</label>
-            <input name="name" placeholder="Enter tournament name" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">Start Date</label>
-            <input name="start_date" type="date" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
-
-            <label className="block mb-1 font-medium">End Date</label>
-            <input name="end_date" type="date" onChange={handleChange} className="w-full p-2 border rounded mb-3" />
+            <input name="name" placeholder="Tournament Name" onChange={handleChange} className={inputClass} required />
+            <input name="start_date" type="date" onChange={handleChange} className={inputClass} required />
+            <input name="end_date" type="date" onChange={handleChange} className={inputClass} required />
           </>
         )}
-
-        <button onClick={handleSubmit} className="mt-2 px-4 py-2 bg-green-600 text-white rounded">
+        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded mt-2">
           Create
         </button>
-      </div>
+      </form>
     );
   };
 
+  const renderTable = (items) => (
+    <div className="bg-white p-6 rounded-xl shadow-md overflow-x-auto">
+      <table className="w-full text-sm border">
+        <thead className="bg-indigo-100 text-indigo-800">
+          <tr>
+            {Object.keys(items[0] || {}).map((key) => (
+              <th key={key} className="px-4 py-2 text-left capitalize">
+                {key}
+              </th>
+            ))}
+            <th className="px-4 py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id} className="border-t hover:bg-gray-50">
+              {Object.keys(item).map((key) => (
+                <td key={key} className="px-4 py-2">
+                  {item[key]}
+                </td>
+              ))}
+              <td className="px-4 py-2 space-x-2">
+                <button onClick={() => setEditItem(item)} className="bg-yellow-400 text-white px-3 py-1 rounded">
+                  Edit
+                </button>
+                <button onClick={() => deleteItem(item.id)} className="bg-red-600 text-white px-3 py-1 rounded">
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   const renderModal = () => {
     if (!editItem) return null;
-
     const handleChange = (e) => setEditItem({ ...editItem, [e.target.name]: e.target.value });
-
     const handleSave = () => {
       const urlMap = {
         users: `http://localhost:5000/api/users/${editItem.id}`,
@@ -185,19 +173,19 @@ const AdminPanel = () => {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-lg w-full max-w-lg">
-          <h2 className="text-xl font-bold mb-4">Edit {tab.slice(0, 1).toUpperCase() + tab.slice(1)}</h2>
+        <div className="bg-white p-6 rounded-xl w-full max-w-md">
+          <h2 className="text-xl font-semibold mb-4">Edit {tab}</h2>
           {Object.keys(editItem).map((key) => (
             <div key={key} className="mb-3">
-              <label className="block text-sm font-medium capitalize mb-1">{key}</label>
+              <label className="block mb-1 text-sm font-medium capitalize">{key}</label>
               <input name={key} value={editItem[key] || ""} onChange={handleChange} className="w-full p-2 border rounded" />
             </div>
           ))}
           <div className="flex justify-end gap-2">
-            <button onClick={() => setEditItem(null)} className="px-4 py-2 bg-gray-300 rounded">
+            <button onClick={() => setEditItem(null)} className="px-4 py-2 bg-gray-200 rounded">
               Cancel
             </button>
-            <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded">
+            <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white rounded">
               Save
             </button>
           </div>
@@ -206,26 +194,81 @@ const AdminPanel = () => {
     );
   };
 
+  const exportAsExcel = () => {
+    const sheet = XLSX.utils.json_to_sheet(tab === "activity" ? activityReport : courtReport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, "Report");
+    XLSX.writeFile(wb, `${tab}_report.xlsx`);
+  };
+
+  const exportAsPDF = () => {
+    const doc = new jsPDF();
+    doc.text(`${tab === "activity" ? "User Activity Report" : "Court Utilization Report"}`, 14, 10);
+    doc.autoTable({ html: "#report-table" });
+    doc.save(`${tab}_report.pdf`);
+  };
+
+  const renderReportChart = (data, labelKey, valueKey) => (
+    <ResponsiveContainer width="100%" height={300}>
+      <PieChart>
+        <Pie data={data} dataKey={valueKey} nameKey={labelKey} cx="50%" cy="50%" outerRadius={100} label>
+          {data.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+        <Legend />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+
+  const currentData = { users, courts, bookings, tournaments }[tab];
+
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
-      <div className="flex gap-4 mb-6">
-        {["users", "courts", "bookings", "tournaments"].map((key) => (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-100 p-8">
+      <h1 className="text-4xl font-bold text-center mb-10 text-indigo-800">Futsal Admin Dashboard</h1>
+
+      <div className="flex flex-wrap justify-center gap-4 mb-8">
+        {["users", "courts", "bookings", "tournaments", "activity", "utilization"].map((key) => (
           <button
             key={key}
-            className={`px-4 py-2 rounded ${tab === key ? "bg-blue-600 text-white" : "bg-white border"}`}
             onClick={() => {
               setTab(key);
               setEditItem(null);
-              setNewItem({});
             }}
+            className={`px-5 py-2 rounded-full text-sm font-semibold shadow-md ${tab === key ? "bg-indigo-600 text-white" : "bg-white text-indigo-600 border border-indigo-600"}`}
           >
             {key.charAt(0).toUpperCase() + key.slice(1)}
           </button>
         ))}
       </div>
-      {renderCreateForm()}
-      <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">{renderTable(currentData)}</div>
+
+      {tab === "activity" && (
+        <div className="bg-white p-6 rounded-xl shadow-xl">
+          <h2 className="text-xl font-semibold text-indigo-700 mb-4">User Activity (Peak Booking Times)</h2>
+          {renderReportChart(activityReport, "hour", "count")}
+          <div className="flex justify-end gap-4 mt-6">
+            <button onClick={exportAsExcel} className="bg-green-600 text-white px-4 py-2 rounded">
+              Export as Excel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === "utilization" && (
+        <div className="bg-white p-6 rounded-xl shadow-xl">
+          <h2 className="text-xl font-semibold text-indigo-700 mb-4">Court Utilization Report</h2>
+          {renderReportChart(courtReport, "court", "count")}
+          <div className="flex justify-end gap-4 mt-6">
+            <button onClick={exportAsExcel} className="bg-green-600 text-white px-4 py-2 rounded">
+              Export as Excel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentData && tab !== "activity" && tab !== "utilization" && renderCreateForm()}
+      {currentData && tab !== "activity" && tab !== "utilization" && renderTable(currentData)}
       {renderModal()}
     </div>
   );

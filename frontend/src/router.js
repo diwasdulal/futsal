@@ -6,10 +6,15 @@ import AdminRoute from "./components/AdminRoute";
 import AdminPanel from "./pages/AdminPanel";
 import UserDashboard from "./pages/UserDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PaymentForm from "./pages/PaymentForm";
+import SuccessPage from "./pages/SuccessPage";
+import TournamentPage from "./pages/TournamentPage";
+import Navbar from "./components/NavBar";
 
 const AppRouter = () => {
   return (
     <Router>
+      <Navbar />
       <Routes>
         <Route path="/booking" element={<Booking />} />
         <Route path="/login" element={<Login />} />
@@ -23,6 +28,14 @@ const AppRouter = () => {
           }
         />
         <Route
+          index
+          element={
+            <ProtectedRoute>
+              <UserDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
@@ -30,6 +43,9 @@ const AppRouter = () => {
             </ProtectedRoute>
           }
         />
+        <Route path="/payment" element={<PaymentForm />} />
+        <Route path="/payment/success" element={<SuccessPage />} />
+        <Route path="/tournament" element={<TournamentPage />} />
       </Routes>
     </Router>
   );

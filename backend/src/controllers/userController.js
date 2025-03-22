@@ -106,3 +106,12 @@ export const updateUser = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getCurrentUser = async (req, res) => {
+  try {
+    const [user] = await pool.query("SELECT id, name, email, phone FROM users WHERE id = ?", [req.user.id]);
+    res.json(user[0]);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get user" });
+  }
+};
