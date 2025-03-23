@@ -246,7 +246,7 @@ const AdminPanel = () => {
       {tab === "activity" && (
         <div className="bg-white p-6 rounded-xl shadow-xl">
           <h2 className="text-xl font-semibold text-indigo-700 mb-4">User Activity (Peak Booking Times)</h2>
-          {renderReportChart(activityReport, "hour", "count")}
+          {renderReportChart(activityReport, "index", "count")}
           <div className="flex justify-end gap-4 mt-6">
             <button onClick={exportAsExcel} className="bg-green-600 text-white px-4 py-2 rounded">
               Export as Excel
